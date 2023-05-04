@@ -17,6 +17,7 @@ export interface ServerConfigValues {
   blobCacheLocation?: string
   repoProvider?: string
   repoSubLockId?: number
+  repoSubBackfillConcurrency?: number
   labelerDid: string
   hiveApiKey?: string
   adminPassword: string
@@ -152,6 +153,10 @@ export class ServerConfig {
 
   get repoSubLockId() {
     return this.cfg.repoSubLockId
+  }
+
+  get repoSubBackfillConcurrency() {
+    return this.cfg.repoSubBackfillConcurrency
   }
 
   get labelerDid() {
