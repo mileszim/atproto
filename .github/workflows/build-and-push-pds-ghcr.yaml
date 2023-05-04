@@ -1,8 +1,12 @@
 name: build-and-push-pds-ghcr
+
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
+      - build
+
 env:
   REGISTRY: ghcr.io
   USERNAME: ${{ github.actor }}

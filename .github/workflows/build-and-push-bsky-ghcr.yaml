@@ -1,8 +1,12 @@
 name: build-and-push-bsky-ghcr
+
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
+      - build
+
 env:
   REGISTRY: ghcr.io
   USERNAME: ${{ github.actor }}
