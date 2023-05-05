@@ -26,7 +26,7 @@ const main = async () => {
   // Use lower-credentialed user to run the app
   const db = Database.postgres({
     url: env.dbPostgresUrl,
-    schema: env.dbSchema,
+    schema: env.dbPostgresSchema,
   })
   const cfg = ServerConfig.readEnv({
     port: env.port,
