@@ -130,6 +130,8 @@ type PgOptions = {
   schema?: string
 }
 
+export type Dialect = 'pg' | 'sqlite'
+
 class LeakyTxPlugin implements KyselyPlugin {
   private txOver: boolean
 
