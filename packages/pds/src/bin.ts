@@ -21,7 +21,9 @@ const run = async () => {
       schema: cfg.dbPostgresSchema,
     })
   } else if (cfg.databaseLocation) {
-    db = Database.sqlite(cfg.databaseLocation)
+    db = Database.sqlite({
+      location: cfg.databaseLocation,
+    })
   } else {
     db = Database.memory()
   }

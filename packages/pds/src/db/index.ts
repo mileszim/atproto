@@ -46,7 +46,7 @@ export class Database {
     }
   }
 
-  static sqlite(location: string): Database {
+  static sqlite({ location }: { location: string }): Database {
     const db = new Kysely<DatabaseSchemaType>({
       dialect: new SqliteDialect({
         database: new SqliteDB(location),
@@ -91,7 +91,7 @@ export class Database {
   }
 
   static memory(): Database {
-    return Database.sqlite(':memory:')
+    return Database.sqlite({ location: ':memory:' })
   }
 
   async startListeningToChannels() {

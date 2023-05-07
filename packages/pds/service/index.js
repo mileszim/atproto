@@ -21,21 +21,16 @@ const { Secp256k1Keypair } = require('@atproto/crypto')
 
 const main = async () => {
   const env = getEnv()
-  // Migrate using credentialed user
-  const migrateDb = Database.postgres({
-    url: pgUrl(env.dbMigrateCreds),
-    schema: env.dbSchema,
+  const location = dbLocation({
+    databaseLoc: env.databaseLoc,
+    databaseUrl: env.databaseUrl,
   })
+  // Migrate using credentialed user
+  const migrateDb = Database.sqlite({ location })
   await migrateDb.migrateToLatestOrThrow()
   await migrateDb.close()
   // Use lower-credentialed user to run the app
-  const db = Database.postgres({
-    url: pgUrl(env.dbCreds),
-    schema: env.dbSchema,
-    poolSize: env.dbPoolSize,
-    poolMaxUses: env.dbPoolMaxUses,
-    poolIdleTimeoutMs: env.dbPoolIdleTimeoutMs,
-  })
+  const db = Database.sqlite({ location })
   const s3Blobstore = new S3BlobStore({ bucket: env.s3Bucket })
   const repoSigningKey = await Secp256k1Keypair.import(env.repoSigningKey)
   const plcRotationKey = await KmsKeypair.load({
@@ -83,6 +78,19 @@ const pgUrl = ({ username, password, host, port }) => {
   return `postgresql://${username}:${enc(password)}@${host}:${port}/postgres`
 }
 
+const sqliteUrl = ({ database_loc }) => `sqlite://${database_loc}`
+
+const dbLocation = ({ databaseLoc, databaseUrl }) => {
+  if (databaseLoc) {
+    return databaseLoc;
+  } else if (databaseUrl) {
+    const dbUrl = new URL(databaseUrl)
+    return `${dbUrl.hostname ? './' : ''}${dbUrl.pathname}`
+  } else {
+    return '/tmp/bsky.db'
+  }
+}
+
 const smtpUrl = ({ username, password, host }) => {
   const enc = encodeURIComponent
   return `smtps://${username}:${enc(password)}@${host}`
@@ -98,9 +106,8 @@ const getEnv = () => ({
   plcRotationKeyId: process.env.PLC_ROTATION_KEY_ID,
   repoSigningKey: process.env.REPO_SIGNING_KEY,
   recoveryKeyId: process.env.RECOVERY_KEY_ID,
-  dbCreds: JSON.parse(process.env.DB_CREDS_JSON),
-  dbMigrateCreds: JSON.parse(process.env.DB_MIGRATE_CREDS_JSON),
-  dbSchema: process.env.DB_SCHEMA || undefined,
+  dbLocation: process.env.DATABASE_LOC,
+  databaseUrl: process.env.DATABASE_URL,
   dbPoolSize: maybeParseInt(process.env.DB_POOL_SIZE),
   dbPoolMaxUses: maybeParseInt(process.env.DB_POOL_MAX_USES),
   dbPoolIdleTimeoutMs: maybeParseInt(process.env.DB_POOL_IDLE_TIMEOUT_MS),
