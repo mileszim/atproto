@@ -7,8 +7,7 @@ import { AddressInfo } from 'net'
 const run = async () => {
   const cfg = ServerConfig.readEnv()
   const db = Database.postgres({
-    url: cfg.dbPostgresUrl,
-    schema: cfg.dbPostgresSchema,
+    url: cfg.databaseUrl,
   })
 
   await db.migrateToLatestOrThrow()

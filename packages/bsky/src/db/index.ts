@@ -2,6 +2,7 @@ import assert from 'assert'
 import {
   Kysely,
   PostgresDialect,
+  SqliteDialect,
   Migrator,
   KyselyPlugin,
   PluginTransformQueryArgs,
@@ -10,7 +11,9 @@ import {
   QueryResult,
   UnknownRow,
 } from 'kysely'
+import SqliteDB from 'better-sqlite3'
 import { Pool as PgPool, types as pgTypes } from 'pg'
+import { dummyDialect } from './util'
 import DatabaseSchema, { DatabaseSchemaType } from './database-schema'
 import * as migrations from './migrations'
 import { CtxMigrationProvider } from './migrations/provider'
@@ -19,12 +22,36 @@ export class Database {
   migrator: Migrator
   destroyed = false
 
-  constructor(public db: DatabaseSchema, public cfg: PgConfig) {
+  constructor(public db: DatabaseSchema, public cfg: DialectConfig) {
     this.migrator = new Migrator({
       db,
-      migrationTableSchema: cfg.schema,
+      migrationTableSchema: cfg.dialect === 'pg' ? cfg.schema : undefined,
       provider: new CtxMigrationProvider(migrations, cfg.dialect),
     })
+  }
+
+  static init(opts: InitOptions): Database {
+    const url = new URL(opts.url)
+    switch (url.protocol) {
+      case 'file':
+      case 'sqlite':
+        return Database.sqlite({
+          location: `${url.hostname}${url.pathname}`,
+        })
+      case 'postgres':
+        return Database.postgres({ url: opts.url, schema: 'public' })
+      default:
+        return Database.memory()
+    }
+  }
+
+  static sqlite(opts: SqliteOptions): Database {
+    const db = new Kysely<DatabaseSchemaType>({
+      dialect: new SqliteDialect({
+        database: new SqliteDB(opts.location),
+      }),
+    })
+    return new Database(db, { dialect: 'sqlite' })
   }
 
   static postgres(opts: PgOptions): Database {
@@ -53,6 +80,10 @@ export class Database {
     })
 
     return new Database(db, { dialect: 'pg', pool, schema, url })
+  }
+
+  static memory(): Database {
+    return Database.sqlite({ location: ':memory:' })
   }
 
   async transaction<T>(fn: (db: Database) => Promise<T>): Promise<T> {
@@ -117,6 +148,10 @@ export class Database {
 
 export default Database
 
+export type Dialect = 'pg' | 'sqlite'
+
+export type DialectConfig = PgConfig | SqliteConfig
+
 export type PgConfig = {
   dialect: 'pg'
   pool: PgPool
@@ -124,10 +159,28 @@ export type PgConfig = {
   schema?: string
 }
 
+export type SqliteConfig = {
+  dialect: 'sqlite'
+}
+
+// Can use with typeof to get types for partial queries
+export const dbType = new Kysely<DatabaseSchema>({ dialect: dummyDialect })
+
 type PgOptions = {
   url: string
   pool?: PgPool
   schema?: string
+  poolSize?: number
+  poolMaxUses?: number
+  poolIdleTimeoutMs?: number
+}
+
+type SqliteOptions = {
+  location: string
+}
+
+type InitOptions = {
+  url: string
 }
 
 class LeakyTxPlugin implements KyselyPlugin {

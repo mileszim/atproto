@@ -17,23 +17,16 @@ const { Database, ServerConfig, BskyAppView } = require('@atproto/bsky')
 const main = async () => {
   const env = getEnv()
   // Migrate using credentialed user
-  const migrateDb = Database.postgres({
-    url: env.dbMigratePostgresUrl,
-    schema: env.dbPostgresSchema,
-  })
+  const migrateDb = Database.init({ url: env.databaseUrl })
   await migrateDb.migrateToLatestOrThrow()
   await migrateDb.close()
   // Use lower-credentialed user to run the app
-  const db = Database.postgres({
-    url: env.dbPostgresUrl,
-    schema: env.dbSchema,
-  })
+  const db = Database.init({ url: env.databaseUrl })
   const cfg = ServerConfig.readEnv({
     port: env.port,
     version: env.version,
     repoProvider: env.repoProvider,
-    dbPostgresUrl: env.dbPostgresUrl,
-    dbPostgresSchema: env.dbPostgresSchema,
+    databaseUrl: env.databaseUrl,
     publicUrl: env.publicUrl,
     didPlcUrl: env.didPlcUrl,
     imgUriSalt: env.imgUriSalt,
@@ -63,10 +56,7 @@ const getEnv = () => ({
   port: parseInt(process.env.PORT),
   version: process.env.BSKY_VERSION,
   repoProvider: process.env.REPO_PROVIDER,
-  dbPostgresUrl: process.env.DB_POSTGRES_URL,
-  dbMigratePostgresUrl:
-    process.env.DB_MIGRATE_POSTGRES_URL || process.env.DB_POSTGRES_URL,
-  dbPostgresSchema: process.env.DB_POSTGRES_SCHEMA || undefined,
+  databaseUrl: process.env.DATABASE_URL,
   publicUrl: process.env.PUBLIC_URL,
   didPlcUrl: process.env.DID_PLC_URL,
   imgUriSalt: process.env.IMG_URI_SALT,
