@@ -7,6 +7,8 @@ import { PreparedWrite } from '../../repo'
 import {
   Commit,
   isCommit,
+  Handle,
+  isHandle,
   OutputSchema as Message,
 } from '../../lexicon/types/com/atproto/sync/subscribeRepos'
 import { ids, lexicons } from '../../lexicon/lexicons'
@@ -24,28 +26,19 @@ export class RepoSubscription {
   constructor(public ctx: AppContext, public service: string) {}
 
   async run() {
-    const { db } = this.ctx
     while (!this.destroyed) {
       try {
         const { ran } = await this.leader.run(async ({ signal }) => {
           const sub = this.getSubscription({ signal })
           for await (const msg of sub) {
-            if (!isCommit(msg)) {
+            if (!isProcessable(msg)) {
               appViewLogger.warn(
                 { msg },
                 'unexpected message on repo subscription stream',
               )
               continue
             }
-            try {
-              const ops = await getOps(msg)
-              await db.transaction(async (tx) => {
-                await this.handleOps(tx, ops, msg.time)
-                await this.setState(tx, { cursor: msg.seq })
-              })
-            } catch (err) {
-              throw new ProcessingError(msg, { cause: err })
-            }
+            await this.handleMessage(this.ctx, msg)
           }
         })
         if (ran && !this.destroyed) {
@@ -129,6 +122,21 @@ export class RepoSubscription {
     }
   }
 
+  private async upsertHandle(tx: Database, handle: Handle) {
+    tx.assertTransaction()
+    const res = await tx.db
+      .updateTable('did_handle')
+      .where('did', '=', handle.did)
+      .set({ handle: handle.handle })
+      .executeTakeFirst()
+    if (res.numUpdatedRows < 1) {
+      await tx.db
+        .insertInto('did_handle')
+        .values({ did: handle.did, handle: handle.handle })
+        .executeTakeFirst()
+    }
+  }
+
   private getSubscription(opts: { signal: AbortSignal }) {
     return new Subscription({
       service: this.service,
@@ -159,6 +167,41 @@ export class RepoSubscription {
         }
       },
     })
+  }
+
+  private async handleCommit(ctx: AppContext, msg: Commit) {
+    const { db } = ctx
+    try {
+      const ops = await getOps(msg)
+      await db.transaction(async (tx) => {
+        await this.handleOps(tx, ops, msg.time)
+        await this.setState(tx, { cursor: msg.seq })
+      })
+    } catch (err) {
+      throw new ProcessingError(msg, { cause: err })
+    }
+  }
+
+  private async handleUpdateHandle(ctx: AppContext, msg: Handle) {
+    const { db } = ctx
+    try {
+      await db.transaction(async (tx) => {
+        await this.upsertHandle(tx, msg)
+      })
+    } catch (err) {
+      throw new ProcessingError(msg, { cause: err })
+    }
+  }
+
+  private async handleMessage(ctx: AppContext, msg: ProcessableMessage) {
+    if (isCommit(msg)) {
+      await this.handleCommit(ctx, msg)
+    } else if (isHandle(msg)) {
+      await this.handleUpdateHandle(ctx, msg)
+    } else {
+      const exhaustiveCheck: never = msg
+      throw new Error(`Unhandled message type: ${exhaustiveCheck['$type']}`)
+    }
   }
 }
 
@@ -215,4 +258,10 @@ class ProcessingError extends Error {
   }
 }
 
+type ProcessableMessage = Commit | Handle
+
 type State = { cursor: number }
+
+function isProcessable(msg: Message): msg is ProcessableMessage {
+  return isCommit(msg) || isHandle(msg)
+}
