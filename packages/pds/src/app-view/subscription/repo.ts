@@ -123,17 +123,22 @@ export class RepoSubscription {
   }
 
   private async upsertHandle(tx: Database, handle: Handle) {
-    tx.assertTransaction()
-    const res = await tx.db
-      .updateTable('did_handle')
-      .where('did', '=', handle.did)
-      .set({ handle: handle.handle })
-      .executeTakeFirst()
-    if (res.numUpdatedRows < 1) {
-      await tx.db
-        .insertInto('did_handle')
-        .values({ did: handle.did, handle: handle.handle })
+    try {
+      tx.assertTransaction()
+      const res = await tx.db
+        .updateTable('did_handle')
+        .where('did', '=', handle.did)
+        .set({ handle: handle.handle })
         .executeTakeFirst()
+      if (res.numUpdatedRows < 1) {
+        await tx.db
+          .insertInto('did_handle')
+          .values({ did: handle.did, handle: handle.handle })
+          .executeTakeFirst()
+      }
+    } catch (err) {
+      // throw new ProcessingError(handle, { cause: err })
+      console.error(`Failed to upsert handle ${handle.did} ${handle.handle}`)
     }
   }
 
