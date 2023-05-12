@@ -20,6 +20,7 @@ export interface ServerConfigValues {
   hiveApiKey?: string
   adminPassword: string
   labelerKeywords: Record<string, string>
+  serverDid: string
 }
 
 export class ServerConfig {
@@ -30,6 +31,7 @@ export class ServerConfig {
     const version = process.env.BSKY_VERSION || '0.0.0'
     const debugMode = process.env.NODE_ENV !== 'production'
     const publicUrl = process.env.PUBLIC_URL || undefined
+    const serverDid = process.env.SERVER_DID || 'did:example:test'
     const envPort = parseInt(process.env.PORT || '', 10)
     const port = isNaN(envPort) ? 2584 : envPort
     const didPlcUrl = process.env.DID_PLC_URL || 'http://localhost:2582'
@@ -61,6 +63,7 @@ export class ServerConfig {
       port,
       publicUrl,
       databaseUrl,
+      serverDid,
       didPlcUrl,
       didCacheStaleTTL,
       didCacheMaxTTL,
@@ -108,6 +111,10 @@ export class ServerConfig {
 
   get databaseUrl() {
     return this.cfg.databaseUrl
+  }
+
+  get serverDid() {
+    return this.cfg.serverDid
   }
 
   get didCacheStaleTTL() {
