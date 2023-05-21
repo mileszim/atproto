@@ -2,6 +2,8 @@ name: build-and-push-pds-ghcr
 on:
   push:
     branches:
+      - main
+      - custom-feeds
       - sqlite
 env:
   REGISTRY: ghcr.io
